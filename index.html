@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Resizer for Android Densities</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        input[type="file"] {
+            margin-bottom: 20px;
+        }
+        .output {
+            margin-top: 20px;
+        }
+        .output img {
+            margin: 10px;
+            border: 1px solid #ccc;
+        }
+        #downloadButton {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #downloadButton:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Resizer for Android Densities</h1>
+        <input type="file" id="imageInput" accept="image/*">
+        <button id="downloadButton" disabled>Download Resized Images</button>
+        <div class="output" id="output"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        const DENSITY_RATIOS = {
+            "xxxhdpi": 4.0,
+            "xxhdpi": 3.0,
+            "xhdpi": 2.0,
+            "hdpi": 1.5,
+            "mdpi": 1.0,
+        };
+
+        function resizeImage(image, density, ratio, filename) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+
+                const newWidth = image.width * (ratio / DENSITY_RATIOS["xxxhdpi"]);
+                const newHeight = image.height * (ratio / DENSITY_RATIOS["xxxhdpi"]);
+
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+
+                ctx.drawImage(image, 0, 0, newWidth, newHeight);
+
+                canvas.toBlob((blob) => {
+                    resolve({ density, blob, width: newWidth, height: newHeight });
+                }, "image/png");
+            });
+        }
+
+        async function handleFileInput(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const image = new Image();
+                image.src = e.target.result;
+
+                image.onload = async () => {
+                    const outputDiv = document.getElementById("output");
+                    outputDiv.innerHTML = ""; 
+
+                    const zip = new JSZip();
+                    const imgFolder = zip.folder("resized_images");
+
+                    for (const [density, ratio] of Object.entries(DENSITY_RATIOS)) {
+                        const result = await resizeImage(image, density, ratio, file.name);
+
+                        imgFolder.file(`${density}/${file.name}`, result.blob);
+
+                        const imgElement = document.createElement("img");
+                        imgElement.src = URL.createObjectURL(result.blob);
+                        imgElement.alt = `${density} (${result.width}x${result.height})`;
+                        imgElement.title = `${density} (${result.width}x${result.height})`;
+
+                        const pElement = document.createElement("p");
+                        pElement.textContent = `${density} (${result.width}x${result.height})`;
+
+                        outputDiv.appendChild(pElement);
+                        outputDiv.appendChild(imgElement);
+                    }
+
+                    const downloadButton = document.getElementById("downloadButton");
+                    downloadButton.disabled = false;
+                    downloadButton.onclick = () => {
+                        zip.generateAsync({ type: "blob" }).then((content) => {
+                            const url = URL.createObjectURL(content);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = "resized_images.zip";
+                            a.click();
+                            URL.revokeObjectURL(url);
+                        });
+                    };
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        document.getElementById("imageInput").addEventListener("change", handleFileInput);
+    </script>
+</body>
+</html>
