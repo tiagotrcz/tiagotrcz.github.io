@@ -93,7 +93,7 @@
                     for (const [density, ratio] of Object.entries(DENSITY_RATIOS)) {
                         const result = await resizeImage(image, density, ratio, file.name);
 
-                        imgFolder.file(`${density}/${file.name}`, result.blob);
+                        imgFolder.file(`drawable-${density}/${file.name}`, result.blob);
 
                         const imgElement = document.createElement("img");
                         imgElement.src = URL.createObjectURL(result.blob);
